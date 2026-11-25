@@ -1,7 +1,7 @@
 {
   "name": "merc-car-garage",
-  "version": "0.2.0",
-  "description": "A pixel-art F1 garage look for the Claude apps: a pit wall with team radio, helmet cams and live data while Claude works, Lights Out on send, yellow and red flags, and garage sounds.",
+  "version": "0.3.0",
+  "description": "A pixel-art F1 garage look for the Claude apps: a pit wall with team radio, helmet cams and live data while Claude works, Lights Out on send, a pit stop timer for tool calls, yellow and red flags, and garage sounds.",
   "license": "MIT",
   "types": "./types/index.d.ts"
 }

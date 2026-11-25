@@ -374,6 +374,48 @@ function toolCart(x: number, y: number): string {
   return out.join('')
 }
 
+const PIT_X = 159
+const PIT_W = 46
+const PIT_Y = 72
+const PIT_H = 14
+
+// One digit that counts by itself: the digits 0 to 9 stacked in a 3 x 5 window,
+// stepped upwards once every tenth of its period, started `elapsed` seconds in.
+function odometer(x: number, y: number, periodS: number, elapsedS: number, color: string): string {
+  const digits = '0123456789'.split('').map((d, i) => pixelText(d, 0, i * 5, color)).join('')
+  return `<svg x="${x}" y="${y}" width="3" height="5" viewBox="0 0 3 5" overflow="hidden">
+<g class="odo" style="animation-duration:${periodS}s;animation-delay:-${(elapsedS % periodS).toFixed(2)}s">${digits}</g>
+</svg>`
+}
+
+/** What the pit stop board shows: a stop in progress, or a finished one and its time. */
+export type PitStopView = { tool: string; startedAt: number; ms?: number; colour?: string }
+
+// The board over the wide middle pit wall screen.
+export function pitStopBoard(stop: PitStopView, nowMs: number): string {
+  const out = [rect(PIT_X - 1, PIT_Y - 1, PIT_W + 2, PIT_H + 2, '#e3a21a'), rect(PIT_X, PIT_Y, PIT_W, PIT_H, '#061012')]
+  const centre = (text: string) => PIT_X + Math.max(0, Math.floor((PIT_W - textWidth(text)) / 2))
+  if (stop.ms === undefined) {
+    const elapsed = Math.max(0, (nowMs - stop.startedAt) / 1000)
+    out.push(pixelText('PIT STOP', centre('PIT STOP'), PIT_Y + 2, '#e7b63a'))
+    const x = PIT_X + Math.floor((PIT_W - 19) / 2)
+    const y = PIT_Y + 8
+    out.push(odometer(x, y, 100, elapsed, '#eef2f3'))
+    out.push(odometer(x + 4, y, 10, elapsed, '#eef2f3'))
+    out.push(pixelText('.', x + 8, y, '#eef2f3'))
+    out.push(odometer(x + 12, y, 1, elapsed, '#eef2f3'))
+    out.push(pixelText('S', x + 16, y, '#eef2f3'))
+  } else {
+    let name = stop.tool.toUpperCase().replace(/[^A-Z0-9 .!]/g, ' ').trim() || 'TOOL'
+    while (textWidth(name) > PIT_W - 2) name = name.slice(0, -1)
+    const time = `${Math.min(stop.ms / 1000, 999.9).toFixed(1)}S`
+    out.push(pixelText(name, centre(name), PIT_Y + 2, '#c9d4d8'))
+    out.push(pixelText(time, centre(time), PIT_Y + 8, stop.colour ?? '#e7b63a'))
+  }
+  // The crew goes quiet on the radio while a stop is on the board.
+  return `<style>.radio { visibility: hidden; }</style><g>${out.join('')}</g>`
+}
+
 function pitWall(racing: boolean): string {
   const out: string[] = []
   // Awning and posts.
@@ -382,10 +424,11 @@ function pitWall(racing: boolean): string {
   out.push(rect(124, 65, 116, 2, '#0f6e67'))
   out.push(rect(127, 67, 2, 52, '#3a4448'), rect(235, 67, 2, 52, '#3a4448'))
   // Monitors on arms.
-  const screens: [number, string][] = [[134, '#2fd3c4'], [159, '#e7b63a'], [184, '#c9d4d8'], [209, '#2fd3c4']]
-  screens.forEach(([x, color], i) => {
-    out.push(barScreen(x, 72, 21, 14, i * 7 + 3, color, racing))
-    out.push(rect(x + 9, 87, 3, 5, '#2a3135'))
+  // The wide middle screen doubles as the pit stop board.
+  const screens: [number, number, string][] = [[134, 21, '#2fd3c4'], [PIT_X, PIT_W, '#e7b63a'], [209, 21, '#2fd3c4']]
+  screens.forEach(([x, w, color], i) => {
+    out.push(barScreen(x, 72, w, 14, i * 7 + 3, color, racing))
+    out.push(rect(x + Math.floor(w / 2) - 1, 87, 3, 5, '#2a3135'))
   })
   // Desk.
   out.push(rect(126, 92, 112, 2, '#9aa5aa'))
@@ -399,6 +442,7 @@ function pitWall(racing: boolean): string {
   out.push(racing ? engineer(204, 90, 'eng3', false, 'n') : swivelEngineer(204, 90, 'n'))
   out.push(radio(racing ? RADIO_RACE : RADIO, racing ? 3 : RADIO_SLOT))
   if (racing) out.push(`<g class="live">${rect(224, 60, 9, 3, '#ff4b3e')}</g>`)
+  out.push('__PITSTOP__')
   return out.join('\n')
 }
 
@@ -595,6 +639,8 @@ function buildScene(racing: boolean, launch = false): string {
 @keyframes radio { 0%, ${radioShown}% { opacity: 1; } ${(Number(radioShown) + 0.01).toFixed(2)}%, 100% { opacity: 0; } }
 .cam { opacity: 0; animation: tw 1.2s linear infinite; }
 .cam0 { opacity: 1; } .cam1 { animation-delay: -0.9s; } .cam2 { animation-delay: -0.6s; } .cam3 { animation-delay: -0.3s; }
+.odo { animation-name: odo; animation-timing-function: steps(10); animation-iteration-count: infinite; }
+@keyframes odo { from { transform: translateY(0); } to { transform: translateY(-50px); } }
 .nodata { opacity: 1; animation: nodata 4s steps(2) infinite alternate; }
 @keyframes nodata { from { opacity: 1; } to { opacity: 0.35; } }
 .tw { opacity: 0; animation: tw 6s linear infinite; }
@@ -642,8 +688,8 @@ ${racing ? '' : driver()}
 
 // The crew's loops run off the clock, not from when the scene was drawn, so the
 // walker and the pit wall keep their place when the garage switches modes.
-export function atTime(scene: string, nowMs: number): string {
-  return scene.replace('__CLOCK__', ((nowMs / 1000) % 100000).toFixed(2))
+export function atTime(scene: string, nowMs: number, board = ''): string {
+  return scene.replace('__CLOCK__', ((nowMs / 1000) % 100000).toFixed(2)).replace('__PITSTOP__', board)
 }
 
 export const GARAGE_IDLE = buildScene(false)

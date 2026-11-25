@@ -1,3 +1,6 @@
+/** The stop on the pit wall's board: running while `ms` is absent, then its time. */
+export type PitStop = { id: number; tool: string; startedAt: number; ms?: number; colour?: string }
+
 /** A race-control flag shown above the prompt. */
 export type Flag = { kind: 'yellow' | 'red'; text: string }
 
@@ -12,6 +15,8 @@ declare module 'claude-code' {
       flag: Flag | null
       /** True for the moment after lights out while the launch car crosses. */
       launching: boolean
+      /** The pit stop board: the current or last tool call, or null when the board is off. */
+      pitstop: PitStop | null
     }
   }
 }

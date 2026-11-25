@@ -5,6 +5,7 @@ An old-school pixel-art Formula One garage theme for the Claude desktop and mobi
 - **A pixel-art garage behind the chat:** wall screens, a timing tower, tyre stacks, and a big pit wall where three engineers in headsets chat over team radio. A crew member walks between the screens checking the data, a helmeted driver wanders through, and the far-right engineer spins his chair round to watch the garage.
 - **Practice vs. race:** between turns it's practice, with screens on "NO DATA" and "NO FEED" and relaxed setup radio. While Claude works, the garage goes live: helmet-cam onboards, scrolling telemetry, a shuffling timing tower and race radio ("PUSH PUSH", "PURPLE S2!").
 - **Lights Out:** when you send a message, five red lights count down above the prompt box, then a car launches across the garage as the race starts.
+- **Pit stop timer:** each tool call Claude makes shows on the pit wall's middle screen with a live timer, then its final time in sector colours: purple for the fastest stop, green for quick, amber for slow, red for a problem.
 - **Flags:** a yellow flag when a tool call fails or is blocked, a red flag when a turn is stopped or ends on an error.
 - **Look:** carbon-black surfaces, silver text and teal accents, with styled message panels and timing-screen tool rows (dark mode).
 - **Sound:** quiet garage ambience and short cues. Turn it on with the speaker button in the session's title bar.

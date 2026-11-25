@@ -1,14 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, ThemeSetArgs, ThemeSound, ThemeStyle, Timer } from 'claude-code'
 
-import type { Flag } from '../types'
+import type { Flag, PitStop } from '../types'
 import { makeColors } from './make-colors.js'
-import { atTime, GARAGE_IDLE, GARAGE_LAUNCH, GARAGE_RACE } from './scene.js'
+import { atTime, GARAGE_IDLE, GARAGE_LAUNCH, GARAGE_RACE, pitStopBoard } from './scene.js'
 
 const racing = atom({ plugin: 'merc-car-garage', key: 'racing' } as const, false)
 const lights = atom({ plugin: 'merc-car-garage', key: 'lights' } as const, 0)
 const flag = atom({ plugin: 'merc-car-garage', key: 'flag' } as const, null)
 const launching = atom({ plugin: 'merc-car-garage', key: 'launching' } as const, false)
+const pitstop = atom({ plugin: 'merc-car-garage', key: 'pitstop' } as const, null)
 
 // Pit Garage: carbon-black surfaces, brushed-silver text, a teal team accent.
 // A dark look by design: garages are lit by screens and strip lights.
@@ -113,6 +114,39 @@ async function startLights($: EngineInterface): Promise<void> {
 }
 
 let launchTimer: Timer | undefined
+// Pit stop board: which stop is newest, the session's fastest, and when to clear the board.
+let stopCount = 0
+let fastestMs = Number.POSITIVE_INFINITY
+let boardTimer: Timer | undefined
+
+async function pitIn($: EngineInterface, tool: string): Promise<number> {
+  stopCount += 1
+  const id = stopCount
+  boardTimer?.cancel()
+  const stop: PitStop = { id, tool, startedAt: await $.clock.now() }
+  await update($, pitstop, () => stop)
+  return id
+}
+
+// Times are coloured like sector times: purple fastest yet, green quick, amber slow, red a problem.
+async function pitOut($: EngineInterface, id: number, isProblem: boolean): Promise<void> {
+  const now = await $.clock.now()
+  const current = await read($, pitstop)
+  if (current === null || current.id !== id) {
+    return
+  }
+  const ms = now - current.startedAt
+  let colour = ms <= 2000 ? '#4fbf6a' : '#e7b63a'
+  if (isProblem) {
+    colour = '#e0463c'
+  } else if (ms < fastestMs) {
+    fastestMs = ms
+    if (id > 1) colour = '#b07be0'
+  }
+  await update($, pitstop, () => ({ ...current, ms, colour }))
+  boardTimer?.cancel()
+  boardTimer = $.clock.after(4000, () => void update($, pitstop, s => (s !== null && s.id === id ? null : s)))
+}
 
 // Race mode on, with the launch car shown for its one pass only.
 async function goRacing($: EngineInterface): Promise<void> {
@@ -205,7 +239,9 @@ export const register: Register = on => {
 
   // Yellow flag when a tool call fails or is blocked.
   on('tool.call', async ($, e, next) => {
+    const id = await pitIn($, e.tool)
     const result = await next(e)
+    await pitOut($, id, result.deny !== undefined || result.isError === true)
     if (result.deny !== undefined || result.isError === true) {
       await showFlag($, { kind: 'yellow', text: `YELLOW FLAG  ·  ${e.tool} ${result.deny !== undefined ? 'was blocked' : 'failed'}` })
     }
@@ -250,10 +286,12 @@ export const register: Register = on => {
     const { Svg } = $.ui.resolve(e)
     const isRacing = await read($, racing)
     const isLaunching = await read($, launching)
+    const stop = await read($, pitstop)
+    const now = await $.clock.now()
 
     return (
       <Svg
-        source={atTime(isRacing ? (isLaunching ? GARAGE_LAUNCH : GARAGE_RACE) : GARAGE_IDLE, await $.clock.now())}
+        source={atTime(isRacing ? (isLaunching ? GARAGE_LAUNCH : GARAGE_RACE) : GARAGE_IDLE, now, stop === null ? '' : pitStopBoard(stop, now))}
         alt={isRacing ? 'The garage in race mode: live telemetry, a shuffling timing tower and busy team radio' : 'A pixel-art racing garage waiting for data, with a pit wall crew on headsets'}
         isInteractive
       />
