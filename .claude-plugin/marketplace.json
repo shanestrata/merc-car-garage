@@ -1,0 +1,5 @@
+{
+  "name": "merc-car-garage",
+  "owner": { "name": "shanestrata" },
+  "plugins": [{ "name": "merc-car-garage", "source": "./" }]
+}
